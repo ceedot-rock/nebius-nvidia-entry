@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rider Marketplace — Hire a verified AI agent</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+  .agent { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+  .badge-live { background: #0a0; color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 0.8em; }
+  .badge-fb { background: #a80; color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 0.8em; }
+  .price { font-weight: bold; }
+  textarea { width: 100%; height: 100px; }
+  button { padding: 0.6rem 1.2rem; font-size: 1rem; cursor: pointer; }
+  #result { white-space: pre-wrap; background: #f6f6f6; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+  #receipt { border: 1px dashed #888; padding: 1rem; margin-top: 1rem; border-radius: 8px; }
+  .src { font-size: 0.85em; color: #666; }
+</style>
+</head>
+<body>
+<h1>Rider Marketplace</h1>
+<p>Hire a verified AI agent. Identity by <b>Agent Rider</b>, brains by
+<b>NVIDIA Nemotron</b> on Nebius Token Factory. Payments are demo
+receipts for now — live AwLPay x402 settlement is planned, not
+implemented.</p>
+<p class="src" id="src"></p>
+
+<div id="agents"><p>Loading live agent registry…</p></div>
+
+<h2>Your task</h2>
+<textarea id="task" placeholder="Describe the task, e.g. Review this Python function for bugs: def add(a,b): return a+b"></textarea><br><br>
+<button id="hire" disabled>Select an agent above first</button>
+
+<div id="result" style="display:none"></div>
+<div id="receipt" style="display:none"></div>
+
+<script>
+let selected = null, selectedName = '';
+async function load() {
+  const r = await fetch('/api/agents');
+  const d = await r.json();
+  document.getElementById('src').textContent =
+    d.source === 'live'
+      ? 'Live agent directory — ' + d.agents.length + ' agents from the Rider registry.'
+      : 'Registry unreachable — showing demo personas.';
+  const el = document.getElementById('agents');
+  el.innerHTML = d.agents.map(a => `
+    <div class="agent" data-id="${a.id}" data-name="${a.name.replace(/"/g,'&quot;')}" style="cursor:pointer">
+      <h3>${a.name}
+        <span class="${d.source === 'live' ? 'badge-live' : 'badge-fb'}">${d.source === 'live' ? 'live registry' : 'demo'}</span>
+      </h3>
+      <p>Skills: ${(a.skills || []).join(', ') || 'general'}${
+        a.trust_score != null ? ' · trust ' + a.trust_score : ''}${
+        a.tasks_completed != null ? ' · ' + a.tasks_completed + ' tasks done' : ''}</p>
+      <p class="price">$${a.price_usd.toFixed(2)} per task</p>
+    </div>`).join('');
+  el.querySelectorAll('.agent').forEach(card => {
+    card.onclick = () => {
+      el.querySelectorAll('.agent').forEach(c => c.style.borderColor = '#ccc');
+      card.style.borderColor = '#0a0';
+      selected = card.dataset.id;
+      selectedName = card.dataset.name;
+      const btn = document.getElementById('hire');
+      btn.disabled = false;
+      btn.textContent = 'Hire ' + selectedName + ' — demo, no live payment';
+    };
+  });
+}
+document.getElementById('hire').onclick = async () => {
+  const task = document.getElementById('task').value.trim();
+  if (!task) { alert('Describe the task first.'); return; }
+  const btn = document.getElementById('hire');
+  btn.disabled = true; btn.textContent = 'Working… (Nemotron is thinking)';
+  const res = document.getElementById('result');
+  const rec = document.getElementById('receipt');
+  res.style.display = 'block'; res.textContent = 'Sending task to Nemotron…';
+  rec.style.display = 'none';
+  try {
+    const r = await fetch('/api/hire', {
+      method: 'POST', headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': {{ api_key | tojson }}
+      },
+      body: JSON.stringify({agent_id: selected, task})
+    });
+    const d = await r.json();
+    if (d.error) { res.textContent = 'Error: ' + d.error; return; }
+    res.textContent = d.result;
+    rec.style.display = 'block';
+    rec.innerHTML = `<b>Receipt</b><br>Agent: ${d.agent} (${d.agent_source} directory)<br>Model: ${d.model}<br>Payment: $${d.payment.amount_usd.toFixed(2)} — ${d.payment.status} (${d.payment.network})<br><span class="src">${d.payment.note}</span>`;
+  } catch (e) {
+    res.textContent = 'Error: ' + e;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Hire again';
+  }
+};
+load();
+</script>
+</body>
+</html>
