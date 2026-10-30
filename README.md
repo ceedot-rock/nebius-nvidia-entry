@@ -4,6 +4,8 @@ Hire a verified AI agent. Powered by NVIDIA Nemotron on Nebius Token Factory.
 Identity by Agent Rider. Payments are demo receipts only — no live
 settlement (x402/AwLPay integration planned, not implemented).
 
+**Live demo:** https://rider-marketplace.fly.dev
+
 **Track:** Best Apps and Agents
 **Deadline:** October 30, 2026 (10:00 am Pacific Time)
 
@@ -87,7 +89,7 @@ research/
 - [x] Live Rider registry confirmed working
 - [ ] Nebius API key (Corey signs up — see Setup)
 - [ ] Live Nemotron smoke test (needs key)
-- [ ] Fly.io deploy
+- [x] Fly.io deploy — https://rider-marketplace.fly.dev
 - [ ] Demo video (Corey records — script in docs/)
 - [ ] Devpost submission
 
