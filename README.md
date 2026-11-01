@@ -69,7 +69,7 @@ app/
   nebius_client.py   # Token Factory chat completions client
   rider_client.py    # Agent Rider registry + credential verify
   smoke_test.py      # live Nemotron inference check (needs key)
-  test_app.py        # 10 pytest tests (mocked, no key needed)
+  test_app.py        # 14 pytest tests (mocked, no key needed)
   templates/index.html
 docs/
   design.md          # demo flow + architecture
