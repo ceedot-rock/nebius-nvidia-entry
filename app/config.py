@@ -14,5 +14,9 @@ NEMOTRON_BALANCED = "nvidia/nemotron-3-super-120b-a12b"
 # Rider
 RIDER_BASE_URL = "https://agentrider.fly.dev"
 
+# Tavily — default search for hired-agent research.
+# Corey provides the key via TAVILY_API_KEY env (never committed).
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
+
 # Demo mode: use Base Sepolia testnet for x402 payments
 X402_NETWORK = "base-sepolia"

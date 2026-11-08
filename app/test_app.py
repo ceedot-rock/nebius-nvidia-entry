@@ -177,3 +177,97 @@ def test_hire_nebius_failure(client, authed):
         )
     assert r.status_code == 502
     assert "Nemotron" in r.get_json()["error"]
+
+
+HITS = [
+    {"title": "Nemotron 3 benchmarks", "url": "https://example.com/n",
+     "content": "Ultra scores X.", "score": 0.9}
+]
+
+
+def test_hire_research_auto_fires(client, authed):
+    with patch.object(main, "_agents_for_display", return_value=(FAKE_LIVE, "live")), \
+         patch.object(main, "tavily_search", return_value=HITS) as ts, \
+         patch.object(main, "chat", return_value="MOCKED research") as m:
+        r = client.post(
+            "/api/hire",
+            json={"agent_id": "abc123", "task": "research the latest Nemotron benchmarks"},
+            headers=authed,
+        )
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["research"] == "tavily:1"
+    assert ts.call_count == 1
+    sent = m.call_args[0][1][1]["content"]
+    assert "Tavily default search" in sent
+    assert "Hired task:" in sent
+
+
+def test_hire_research_false_skips(client, authed):
+    with patch.object(main, "_agents_for_display", return_value=(FAKE_LIVE, "live")), \
+         patch.object(main, "tavily_search") as ts, \
+         patch.object(main, "chat", return_value="MOCKED bare"):
+        r = client.post(
+            "/api/hire",
+            json={"agent_id": "abc123", "task": "research the latest X", "research": False},
+            headers=authed,
+        )
+    assert r.status_code == 200
+    assert r.get_json()["research"] == "off"
+    assert ts.call_count == 0
+
+
+def test_hire_non_research_skips_by_default(client, authed):
+    with patch.object(main, "_agents_for_display", return_value=(FAKE_LIVE, "live")), \
+         patch.object(main, "tavily_search") as ts, \
+         patch.object(main, "chat", return_value="MOCKED review"):
+        r = client.post(
+            "/api/hire",
+            json={"agent_id": "abc123", "task": "review: def f(x): return x"},
+            headers=authed,
+        )
+    assert r.status_code == 200
+    assert r.get_json()["research"] == "off"
+    assert ts.call_count == 0
+
+
+def test_hire_research_unavailable_runs_bare(client, authed):
+    with patch.object(main, "_agents_for_display", return_value=(FAKE_LIVE, "live")), \
+         patch.object(main, "tavily_search",
+                      side_effect=main.TavilyError("TAVILY_API_KEY is not set")), \
+         patch.object(main, "chat", return_value="MOCKED bare") as m:
+        r = client.post(
+            "/api/hire",
+            json={"agent_id": "abc123", "task": "what is Nemotron", "research": True},
+            headers=authed,
+        )
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["research"].startswith("unavailable:")
+    assert m.call_args[0][1][1]["content"] == "what is Nemotron"
+
+
+def test_looks_like_research_signals():
+    assert main.looks_like_research("compare Ultra vs Nano pricing") is True
+    assert main.looks_like_research("review: def f(x): return x") is False
+    assert main.looks_like_research("") is False
+
+
+def test_tavily_search_needs_query(monkeypatch):
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    with pytest.raises(main.TavilyError):
+        main.tavily_search("   ")
+
+
+def test_tavily_search_needs_key(monkeypatch):
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr("tavily_client.CONFIG_KEY", "")
+    with pytest.raises(main.TavilyError):
+        main.tavily_search("hello")
+
+
+def test_tavily_format_context_bounds():
+    assert main.tavily_context([]) == ""
+    block = main.tavily_context(HITS, limit_chars=120)
+    assert len(block) <= 120
+    assert "benchmarks" in block

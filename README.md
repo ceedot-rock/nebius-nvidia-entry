@@ -35,6 +35,7 @@ for the full API brief.
 pip install -r app/requirements.txt
 export NEBIUS_API_KEY=your-key-here   # from https://tokenfactory.nebius.com
 export NEBIUS_ENTRY_API_KEY=any-random-secret   # gates /api/hire (set on every deploy)
+export TAVILY_API_KEY=your-key-here   # default search for hired-agent research (from https://app.tavily.com/home)
 cd app && python main.py
 ```
 
@@ -51,14 +52,17 @@ Nebius AI Builder Program (dev.nebius.com) for another $25.
 cd app
 export NEBIUS_API_KEY=your-key-here
 export NEBIUS_ENTRY_API_KEY=any-random-secret
+export TAVILY_API_KEY=your-key-here
 python smoke_test.py        # real Nemotron inference check
-python -m pytest test_app.py -v   # 14 tests, all mocked (no key needed)
+python -m pytest test_app.py -v   # 22 tests, all mocked (no key needed)
 ```
 
 `NEBIUS_ENTRY_API_KEY` is the shared secret for `/api/hire`: the browser
 page gets it server-side and sends it as the `X-API-Key` header. Without
 the env var set (or with a wrong header), `/api/hire` answers 401 — the
 endpoint spends Nebius credits, so it is never left open.
+
+Research-shaped hires also get fresh Tavily web context by default (`research` in the response reports `tavily:N`, `off`, or `unavailable:reason`). Pass `"research": false` to skip it, `true` to force it. Without `TAVILY_API_KEY` the hire still runs — bare, and flagged.
 
 ## Project layout
 

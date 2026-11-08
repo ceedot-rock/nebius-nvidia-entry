@@ -18,6 +18,12 @@ from flask import Flask, jsonify, render_template, request
 from config import NEMOTRON_REASONING, RIDER_BASE_URL
 from nebius_client import chat, NebiusError
 from rider_client import search_agents, verify_credential, RiderError
+from tavily_client import (
+    format_context as tavily_context,
+    looks_like_research,
+    search as tavily_search,
+    TavilyError,
+)
 
 app = Flask(__name__)
 
@@ -139,13 +145,34 @@ def hire():
     if not agent:
         return jsonify({"error": f"unknown agent: {agent_id}"}), 404
 
+    # Default web research (Tavily) for research-shaped tasks.
+    # research=true forces it, research=false disables it, "auto"
+    # (default) fires on research signals. A missing key never blocks
+    # the hire — the run proceeds bare and says so.
+    research = data.get("research", "auto")
+    if research is True:
+        want_research = True
+    elif research is False or str(research).lower() == "false":
+        want_research = False
+    else:
+        want_research = looks_like_research(task)
+    research_status = "off"
+    task_for_model = task
+    if want_research:
+        try:
+            hits = tavily_search(task, max_results=3)
+            task_for_model = tavily_context(hits) + "\n\nHired task:\n" + task
+            research_status = f"tavily:{len(hits)}"
+        except TavilyError as e:
+            research_status = f"unavailable:{str(e)[:80]}"
+
     # Execute the task with Nemotron 3 Ultra (reasoning model)
     try:
         result = chat(
             NEMOTRON_REASONING,
             [
                 {"role": "system", "content": agent["system_prompt"]},
-                {"role": "user", "content": task},
+                {"role": "user", "content": task_for_model},
             ],
             max_tokens=2048,
         )
@@ -166,6 +193,7 @@ def hire():
         {
             "agent": agent["name"],
             "agent_source": source,
+            "research": research_status,
             "model": NEMOTRON_REASONING,
             "result": result,
             "payment": payment,
